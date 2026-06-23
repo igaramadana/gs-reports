@@ -257,6 +257,10 @@ function App() {
   const [form, setForm] = useState<ReportForm>(EMPTY_FORM);
 
   useEffect(() => {
+    setChatText("");
+  }, [selectedId, state.mode]);
+
+  useEffect(() => {
     const handler = (event: MessageEvent) => {
       const data = event.data;
 
@@ -903,6 +907,24 @@ function EmptyState({
   );
 }
 
+function getVisibleMessages(report?: Report) {
+  if (!report) return [];
+
+  const description = report.description.trim();
+  const first = report.messages[0];
+
+  if (
+    first &&
+    first.role === "player" &&
+    description.length > 0 &&
+    first.message.trim() === description
+  ) {
+    return report.messages.slice(1);
+  }
+
+  return report.messages;
+}
+
 function ReportDetail({
   report,
   adminName,
@@ -927,6 +949,7 @@ function ReportDetail({
   onBringReporter: () => void;
 }) {
   const chatRef = useRef<HTMLDivElement | null>(null);
+  const visibleMessages = getVisibleMessages(report);
 
   useEffect(() => {
     const el = chatRef.current;
@@ -979,13 +1002,17 @@ function ReportDetail({
       </div>
 
       <div ref={chatRef} className="chat-area scroll-area">
-        {report.messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            adminName={adminName}
+        {visibleMessages.length > 0 ? (
+          visibleMessages.map((message) => (
+            <MessageBubble key={message.id} message={message} />
+          ))
+        ) : (
+          <EmptyState
+            icon={<FaComments />}
+            title="Belum Ada Percakapan"
+            description="Balasan admin dan player akan tampil di sini."
           />
-        ))}
+        )}
       </div>
 
       <div className="chat-input-wrap">
@@ -1094,21 +1121,13 @@ function ReportActions({
   );
 }
 
-function MessageBubble({
-  message,
-  adminName,
-}: {
-  message: ReportMessage;
-  adminName: string;
-}) {
-  const isAdmin = message.role === "admin";
-
+function MessageBubble({ message }: { message: ReportMessage }) {
   return (
-    <div className={`message-row ${isAdmin ? "admin" : ""}`}>
+    <div className={`message-row ${message.role}`}>
       <div className="message-bubble">
         <div className="message-author">
           <MessageAuthorIcon role={message.role} />
-          {getMessageAuthor(message, adminName)}
+          {getMessageAuthor(message)}
         </div>
 
         <p className="message-text">{message.message}</p>
@@ -1125,10 +1144,8 @@ function MessageAuthorIcon({ role }: { role: ReportMessageRole }) {
   return <FaUser />;
 }
 
-function getMessageAuthor(message: ReportMessage, adminName: string) {
-  if (message.role === "admin") return adminName;
+function getMessageAuthor(message: ReportMessage) {
   if (message.role === "system") return "System";
-
   return message.author;
 }
 
@@ -1159,6 +1176,8 @@ function PlayerReportView({
 
     el.scrollTop = el.scrollHeight;
   }, [activeReport?.id, activeReport?.messages.length]);
+
+  const activeVisibleMessages = getVisibleMessages(activeReport);
 
   return (
     <section className={`player-report-shell ${activeReport ? "with-chat" : ""}`}>
@@ -1218,13 +1237,9 @@ function PlayerReportView({
               </div>
 
               <div ref={chatRef} className="chat-area player-chat-area scroll-area">
-                {activeReport.messages.length > 0 ? (
-                  activeReport.messages.map((message) => (
-                    <MessageBubble
-                      key={message.id}
-                      message={message}
-                      adminName={activeReport.assignedAdmin ?? "Admin"}
-                    />
+                {activeVisibleMessages.length > 0 ? (
+                  activeVisibleMessages.map((message) => (
+                    <MessageBubble key={message.id} message={message} />
                   ))
                 ) : (
                   <EmptyState
